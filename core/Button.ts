@@ -1,13 +1,19 @@
-import { Node } from "./Node";
-import { IVec2 } from "./Interfaces";
-import { AssetDB } from "./AssetDB";
 
-export class ImageView extends Node {
+import { Node } from "./Node";
+import { AssetDB } from "./AssetDB";
+import { IVec2 } from "./Interfaces";
+
+export class Button extends Node {
 	public spriteFrameUUID: string;
 
 	public Create() {
-		this.cppString = "auto " + this.name + " = cocos2d::ui::ImageView::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+		// TODO: Proper image path
+		this.cppString = "auto " + this.name + " = cocos2d::ui::Button::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
 		this.cppString += this.name + "->setScale9Enabled(true);\n";
+	}
+
+	public setTextLabel(textLabelName: string) {
+		this.cppString += this.name + "->setTitleLabel(" + textLabelName + ");\n";
 	}
 
 	public setPosition(position: IVec2) {

@@ -14,14 +14,14 @@ var __extends = (this && this.__extends) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 var Node_1 = require("./Node");
+var AssetDB_1 = require("./AssetDB");
 var Sprite = /** @class */ (function (_super) {
     __extends(Sprite, _super);
     function Sprite() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
     Sprite.prototype.Create = function () {
-        // TODO: Proper image path
-        this.cppString = "auto " + this.name + " = cocos2d::Sprite::create(\"" + "sprites/rect_curved1.png" + "\");\n";
+        this.cppString = "auto " + this.name + " = cocos2d::Sprite::create(\"" + AssetDB_1.AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
     };
     return Sprite;
 }(Node_1.Node));

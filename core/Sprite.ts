@@ -1,8 +1,10 @@
 import { Node } from "./Node";
+import { AssetDB } from "./AssetDB";
 
 export class Sprite extends Node {
+	public spriteFrameUUID: string;
+
 	public Create() {
-		// TODO: Proper image path
-		this.cppString = "auto " + this.name + " = cocos2d::Sprite::create(\"" + "sprites/rect_curved1.png" + "\");\n";
+		this.cppString = "auto " + this.name + " = cocos2d::Sprite::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
 	}
 }

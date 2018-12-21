@@ -15,16 +15,20 @@ var __extends = (this && this.__extends) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 var Node_1 = require("./Node");
 var AssetDB_1 = require("./AssetDB");
-var ImageView = /** @class */ (function (_super) {
-    __extends(ImageView, _super);
-    function ImageView() {
+var Button = /** @class */ (function (_super) {
+    __extends(Button, _super);
+    function Button() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    ImageView.prototype.Create = function () {
-        this.cppString = "auto " + this.name + " = cocos2d::ui::ImageView::create(\"" + AssetDB_1.AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+    Button.prototype.Create = function () {
+        // TODO: Proper image path
+        this.cppString = "auto " + this.name + " = cocos2d::ui::Button::create(\"" + AssetDB_1.AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
         this.cppString += this.name + "->setScale9Enabled(true);\n";
     };
-    ImageView.prototype.setPosition = function (position) {
+    Button.prototype.setTextLabel = function (textLabelName) {
+        this.cppString += this.name + "->setTitleLabel(" + textLabelName + ");\n";
+    };
+    Button.prototype.setPosition = function (position) {
         this.position = { x: position.x, y: position.y };
         position.x *= this.scaleX;
         position.y *= this.scaleY;
@@ -38,6 +42,6 @@ var ImageView = /** @class */ (function (_super) {
             this.cppString += this.name + "->setPosition(cocos2d::Vec2(" + position.x + " + this->getParent()->getContentSize().width / 2.0f, " + position.y + " + this->getParent()->getContentSize().height / 2.0f));\n";
         }
     };
-    return ImageView;
+    return Button;
 }(Node_1.Node));
-exports.ImageView = ImageView;
+exports.Button = Button;
