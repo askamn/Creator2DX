@@ -14,5 +14,6 @@ let parser = new Parser(file);
 
 parser.Parse();
 
+
 writeFileSync("./output/" + parser.GetClassName() + ".h", parser.GetHeaderFileContents());
 writeFileSync("./output/" + parser.GetClassName() + ".cpp", parser.GetCPPFileContents());

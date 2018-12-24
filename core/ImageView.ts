@@ -1,13 +1,25 @@
 import { Node } from "./Node";
 import { IVec2 } from "./Interfaces";
 import { AssetDB } from "./AssetDB";
+import { ICCNode } from "./creator/interfaces/ICCNode";
 
 export class ImageView extends Node {
 	public spriteFrameUUID: string;
 
-	public Create() {
+	public Create(data: ICCNode = null) {
 		this.cppString = "auto " + this.name + " = cocos2d::ui::ImageView::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
 		this.cppString += this.name + "->setScale9Enabled(true);\n";
+
+		if(data) {
+			this.setPosition(data._position);
+			this.setRotation(data._rotationX);
+			this.setScale(data._scale);
+			this.setAnchorPoint(data._anchorPoint);
+			this.setContentSize(data._contentSize);
+			this.setColor(data._color);
+			this.setOpacity(data._opacity);
+			this.setSkew(data._skewX, data._skewY);
+		}
 	}
 
 	public setPosition(position: IVec2) {

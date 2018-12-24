@@ -20,9 +20,20 @@ var ImageView = /** @class */ (function (_super) {
     function ImageView() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    ImageView.prototype.Create = function () {
+    ImageView.prototype.Create = function (data) {
+        if (data === void 0) { data = null; }
         this.cppString = "auto " + this.name + " = cocos2d::ui::ImageView::create(\"" + AssetDB_1.AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
         this.cppString += this.name + "->setScale9Enabled(true);\n";
+        if (data) {
+            this.setPosition(data._position);
+            this.setRotation(data._rotationX);
+            this.setScale(data._scale);
+            this.setAnchorPoint(data._anchorPoint);
+            this.setContentSize(data._contentSize);
+            this.setColor(data._color);
+            this.setOpacity(data._opacity);
+            this.setSkew(data._skewX, data._skewY);
+        }
     };
     ImageView.prototype.setPosition = function (position) {
         this.position = { x: position.x, y: position.y };

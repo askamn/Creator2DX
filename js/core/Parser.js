@@ -8,6 +8,8 @@ var path_1 = require("path");
 var AssetDB_1 = require("./AssetDB");
 var Label_1 = require("./Label");
 var Button_1 = require("./Button");
+var config_1 = require("../config");
+var ScrollView_1 = require("./ScrollView");
 var Components;
 (function (Components) {
     Components[Components["Sprite"] = 1] = "Sprite";
@@ -22,8 +24,6 @@ var CREATOR_DESIGN_RESOLUTION_WIDTH = 720;
 var CREATOR_DESIGN_RESOLUTION_HEIGHT = 1280;
 var SCALE_X = COCOS_2DX_DESIGN_RESOLUTION_WIDTH / CREATOR_DESIGN_RESOLUTION_WIDTH;
 var SCALE_Y = COCOS_2DX_DESIGN_RESOLUTION_HEIGHT / CREATOR_DESIGN_RESOLUTION_HEIGHT;
-var Header = "#pragma once\n\n#include \"cocos2d.h\"\n#include \"ui/CocosGUI.h\"\n\nnamespace MyAwesomeGame\n{\n\nclass {%CLASSNAME%} : public cocos2d::Node\n{\npublic:\n\tvirtual bool init() override;\n\tCREATE_FUNC({%CLASSNAME%});\n\t\n\tvoid InitChildren();\n};\n\n}";
-var Class = "#include \"CharacterSelectorUI.h\"\n\nnamespace MyAwesomeGame {\n\nbool {%CLASSNAME%}::init()\n{\n\tif (!cocos2d::Node::init())\n\t{\n\t\treturn false;\n\t}\n\t\n\treturn true;\n}\n\t\nvoid {%CLASSNAME%}::InitChildren()\n{\n\t{%PARSER_OUTPUT%}\n}\n\t\n}\n";
 var Parser = /** @class */ (function () {
     function Parser(filePath) {
         var data = null;
@@ -73,11 +73,12 @@ var Parser = /** @class */ (function () {
         var replacements = {
             '{%CLASSNAME%}': this.className,
             '{%PARSER_OUTPUT%}': this.output,
+            '{%NAMESPACE%}': config_1.Config.Namespace,
         };
-        this.headerFile = Header.replace(/{%\w+%}/g, function (all) {
+        this.headerFile = config_1.Config.HeaderTemplate.replace(/{%\w+%}/g, function (all) {
             return replacements[all] || all;
         });
-        this.cppFile = Class.replace(/{%\w+%}/g, function (all) {
+        this.cppFile = config_1.Config.CPPTemplate.replace(/{%\w+%}/g, function (all) {
             return replacements[all] || all;
         });
     };
@@ -95,6 +96,9 @@ var Parser = /** @class */ (function () {
     Parser.prototype.isLabel = function (component) {
         return component.__type__ == 'cc.Label';
     };
+    Parser.prototype.isScrollView = function (component) {
+        return component.__type__ == 'cc.ScrollView';
+    };
     Parser.prototype.isNode = function (component) {
         return component.__type__ == 'cc.Node';
     };
@@ -106,6 +110,16 @@ var Parser = /** @class */ (function () {
             }
         }
         return false;
+    };
+    Parser.prototype.parseScrollView = function (object, component, parent) {
+        var scrollview = new ScrollView_1.ScrollView(object._name, SCALE_X, SCALE_Y);
+        // Only parse the sprite if it has a sprite frame
+        scrollview.parent = parent;
+        scrollview.Create(object);
+        scrollview.SetProperties(component);
+        scrollview.setInnerContainerSize(this.json[component.content.__id__]);
+        this.output += scrollview.GetCPPString();
+        return scrollview;
     };
     Parser.prototype.parseSprite = function (object, component, parent) {
         var sprite = null;
@@ -125,14 +139,7 @@ var Parser = /** @class */ (function () {
         if (component._spriteFrame) {
             sprite.parent = parent;
             sprite.spriteFrameUUID = component._spriteFrame.__uuid__;
-            sprite.Create();
-            sprite.setPosition(object._position);
-            sprite.setScale(object._scale);
-            sprite.setContentSize(object._contentSize);
-            sprite.setAnchorPoint(object._anchorPoint);
-            sprite.setColor(object._color);
-            sprite.setOpacity(object._opacity);
-            sprite.setRotation(object._rotationX);
+            sprite.Create(object);
             this.output += sprite.GetCPPString();
         }
         else {
@@ -143,10 +150,10 @@ var Parser = /** @class */ (function () {
     Parser.prototype.parseButton = function (object, parent) {
         var spriteFrameUUID = null;
         var buttonText = null;
-        var fontSize = null;
         var button = null;
-        var lineHeight = null;
         var textColor = null;
+        var ccsprite;
+        var cclabel = null;
         // First find the sprite
         for (var i = 0; i < object._components.length; ++i) {
             var component = this.json[object._components[i].__id__];
@@ -161,35 +168,22 @@ var Parser = /** @class */ (function () {
                 spriteFrameUUID = this.getComponent(child, Components.Sprite)._spriteFrame.__uuid__;
             }
             else if (child.__name == "label") {
-                var labelComponent = this.getComponent(child, Components.Label);
-                buttonText = labelComponent._string;
-                fontSize = labelComponent._fontSize;
-                lineHeight = labelComponent._lineHeight;
+                cclabel = this.getComponent(child, Components.Label);
                 textColor = child._color;
             }
         }
-        if (buttonText == null || spriteFrameUUID == null) {
+        if (cclabel == null || spriteFrameUUID == null) {
             console.warn("Missing text or sprite frame for cc.Button.", buttonText, spriteFrameUUID);
             return null;
         }
         // Create a new label
         var label = new Label_1.Label(object._name + "_label", SCALE_X, SCALE_Y);
-        label.Create();
-        label.setText(buttonText, fontSize);
-        label.setLineHeight(lineHeight);
-        label.setTextColor(textColor);
+        label.CreateWithData(cclabel, textColor);
         this.output += label.GetCPPString();
         button = new Button_1.Button(object._name, SCALE_X, SCALE_Y);
         button.spriteFrameUUID = spriteFrameUUID;
         button.parent = parent;
-        button.Create();
-        button.setPosition(object._position);
-        button.setScale(object._scale);
-        button.setContentSize(object._contentSize);
-        button.setAnchorPoint(object._anchorPoint);
-        button.setColor(object._color);
-        button.setOpacity(object._opacity);
-        button.setRotation(object._rotationX);
+        button.Create(object);
         button.setTextLabel(label.name);
         this.output += button.GetCPPString();
         return button;
@@ -249,19 +243,16 @@ var Parser = /** @class */ (function () {
                         isParsed = true;
                         currentNode = this.parseSprite(object, component, parent);
                     }
+                    else if (this.isScrollView(component) && !isParsed) {
+                        isParsed = true;
+                        currentNode = this.parseScrollView(object, component, parent);
+                    }
                 }
             }
             if (!isParsed) {
                 var node = new Node_1.Node((isRoot ? "this" : object._name), SCALE_X, SCALE_Y);
                 node.parent = parent;
-                node.Create();
-                node.setPosition(object._position);
-                node.setScale(object._scale);
-                node.setContentSize(object._contentSize);
-                node.setAnchorPoint(object._anchorPoint);
-                node.setColor(object._color);
-                node.setOpacity(object._opacity);
-                node.setRotation(object._rotationX);
+                node.Create(object);
                 currentNode = node;
                 this.output += node.GetCPPString();
             }

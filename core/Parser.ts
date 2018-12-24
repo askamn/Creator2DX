@@ -6,7 +6,12 @@ import { resolve } from "path";
 import { AssetDB } from "./AssetDB";
 import { Label } from "./Label";
 import { Button } from "./Button";
-import { IColor } from "./Interfaces";
+import { ICCLabel } from "./creator/interfaces/ICCLabel";
+import { ICCSprite } from "./creator/interfaces/ICCSprite";
+import { ICCColor } from "./creator/interfaces/ICCColor";
+import { Config } from "../config";
+import { ScrollView } from "./ScrollView";
+import { ICCScrollView } from "./creator/interfaces/ICCScrollView";
 
 enum Components {
 	Sprite = 1,
@@ -24,47 +29,6 @@ const CREATOR_DESIGN_RESOLUTION_HEIGHT = 1280;
 
 const SCALE_X = COCOS_2DX_DESIGN_RESOLUTION_WIDTH / CREATOR_DESIGN_RESOLUTION_WIDTH;
 const SCALE_Y = COCOS_2DX_DESIGN_RESOLUTION_HEIGHT / CREATOR_DESIGN_RESOLUTION_HEIGHT;
-
-const Header = `#pragma once
-
-#include "cocos2d.h"
-#include "ui/CocosGUI.h"
-
-namespace MyAwesomeGame
-{
-
-class {%CLASSNAME%} : public cocos2d::Node
-{
-public:
-	virtual bool init() override;
-	CREATE_FUNC({%CLASSNAME%});
-	
-	void InitChildren();
-};
-
-}`;
-
-const Class = `#include "CharacterSelectorUI.h"
-
-namespace MyAwesomeGame {
-
-bool {%CLASSNAME%}::init()
-{
-	if (!cocos2d::Node::init())
-	{
-		return false;
-	}
-	
-	return true;
-}
-	
-void {%CLASSNAME%}::InitChildren()
-{
-	{%PARSER_OUTPUT%}
-}
-	
-}
-`;
 
 export class Parser {
 	private json: Object;
@@ -137,13 +101,14 @@ export class Parser {
 		let replacements = {
 			'{%CLASSNAME%}': this.className,
 			'{%PARSER_OUTPUT%}': this.output,
+			'{%NAMESPACE%}': Config.Namespace,
 		};
 
-		this.headerFile = Header.replace(/{%\w+%}/g, function (all) {
+		this.headerFile = Config.HeaderTemplate.replace(/{%\w+%}/g, function (all) {
 			return replacements[all] || all;
 		});
 
-		this.cppFile = Class.replace(/{%\w+%}/g, function (all) {
+		this.cppFile = Config.CPPTemplate.replace(/{%\w+%}/g, function (all) {
 			return replacements[all] || all;
 		});
 	}
@@ -166,6 +131,10 @@ export class Parser {
 		return component.__type__ == 'cc.Label';
 	}
 
+	private isScrollView(component) {
+		return component.__type__ == 'cc.ScrollView';
+	}
+
 	private isNode(component) {
 		return component.__type__ == 'cc.Node';
 	}
@@ -180,6 +149,20 @@ export class Parser {
 		}
 
 		return false;
+	}
+
+	private parseScrollView(object: any, component: ICCScrollView, parent: Node): ScrollView {
+		let scrollview: ScrollView = new ScrollView(object._name, SCALE_X, SCALE_Y);
+
+		// Only parse the sprite if it has a sprite frame
+		scrollview.parent = parent;
+		scrollview.Create(object);
+		scrollview.SetProperties(component);
+		scrollview.setInnerContainerSize(this.json[component.content.__id__]);
+
+		this.output += scrollview.GetCPPString();
+
+		return scrollview;
 	}
 
 	private parseSprite(object: any, component: any, parent: Node): Sprite | ImageView {
@@ -201,14 +184,7 @@ export class Parser {
 		if (component._spriteFrame) {
 			sprite.parent = parent;
 			sprite.spriteFrameUUID = component._spriteFrame.__uuid__;
-			sprite.Create();
-			sprite.setPosition(object._position);
-			sprite.setScale(object._scale);
-			sprite.setContentSize(object._contentSize);
-			sprite.setAnchorPoint(object._anchorPoint);
-			sprite.setColor(object._color);
-			sprite.setOpacity(object._opacity);
-			sprite.setRotation(object._rotationX);
+			sprite.Create(object);
 
 			this.output += sprite.GetCPPString();
 		} else {
@@ -221,10 +197,11 @@ export class Parser {
 	private parseButton(object, parent): Button {
 		let spriteFrameUUID: string = null;
 		let buttonText: string = null;
-		let fontSize: number = null;
 		let button: Button = null;
-		let lineHeight: number = null;
-		let textColor: IColor = null;
+		let textColor: ICCColor = null;
+
+		let ccsprite: ICCSprite;
+		let cclabel: ICCLabel = null;
 
 		// First find the sprite
 		for (let i = 0; i < object._components.length; ++i) {
@@ -241,39 +218,26 @@ export class Parser {
 			if (child.__name == "base") {
 				spriteFrameUUID = this.getComponent(child, Components.Sprite)._spriteFrame.__uuid__;
 			} else if (child.__name == "label") {
-				let labelComponent = this.getComponent(child, Components.Label);
-				buttonText = labelComponent._string;
-				fontSize = labelComponent._fontSize;
-				lineHeight = labelComponent._lineHeight;
+				cclabel = this.getComponent(child, Components.Label);
 				textColor = child._color;
 			}
 		}
 
-		if (buttonText == null || spriteFrameUUID == null) {
+		if (cclabel == null || spriteFrameUUID == null) {
 			console.warn("Missing text or sprite frame for cc.Button.", buttonText, spriteFrameUUID);
 			return null;
 		}
 
 		// Create a new label
 		let label = new Label(object._name + "_label", SCALE_X, SCALE_Y);
-		label.Create();
-		label.setText(buttonText, fontSize);
-		label.setLineHeight(lineHeight);
-		label.setTextColor(textColor);
+		label.CreateWithData(cclabel, textColor);
 
 		this.output += label.GetCPPString();
 
 		button = new Button(object._name, SCALE_X, SCALE_Y);
 		button.spriteFrameUUID = spriteFrameUUID;
 		button.parent = parent;
-		button.Create();
-		button.setPosition(object._position);
-		button.setScale(object._scale);
-		button.setContentSize(object._contentSize);
-		button.setAnchorPoint(object._anchorPoint);
-		button.setColor(object._color);
-		button.setOpacity(object._opacity);
-		button.setRotation(object._rotationX);
+		button.Create(object);
 		button.setTextLabel(label.name);
 		this.output += button.GetCPPString();
 
@@ -335,22 +299,18 @@ export class Parser {
 					if (this.isSprite(component) && !isParsed) {
 						isParsed = true;
 						currentNode = this.parseSprite(object, component, parent);
+					} else if (this.isScrollView(component) && !isParsed) {
+						isParsed = true;
+						currentNode = this.parseScrollView(object, component, parent);
 					}
 				}
 			}
 
 			if (!isParsed) {
 				let node = new Node((isRoot ? "this" : object._name), SCALE_X, SCALE_Y);
-
 				node.parent = parent;
-				node.Create();
-				node.setPosition(object._position);
-				node.setScale(object._scale);
-				node.setContentSize(object._contentSize);
-				node.setAnchorPoint(object._anchorPoint);
-				node.setColor(object._color);
-				node.setOpacity(object._opacity);
-				node.setRotation(object._rotationX);
+				node.Create(object);
+
 				currentNode = node;
 
 				this.output += node.GetCPPString();

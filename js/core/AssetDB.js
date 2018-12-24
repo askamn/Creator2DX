@@ -48,6 +48,9 @@ var AssetDB = /** @class */ (function () {
                 var pathBits = this.UUIDMap[json.content.texture].relativePath.split('/');
                 return 'sprites/' + pathBits[pathBits.length - 1];
             }
+            case 'cc.TTFFont': {
+                return 'fonts/' + json._name + '.ttf';
+            }
         }
     };
     AssetDB.instance = null;

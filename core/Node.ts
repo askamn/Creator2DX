@@ -1,4 +1,8 @@
 import { IVec2, ISize, IColor } from "./Interfaces";
+import { ICCLabel } from "./creator/interfaces/ICCLabel";
+import { ICCSprite } from "./creator/interfaces/ICCSprite";
+import { ICCButton } from "./creator/interfaces/ICCButton";
+import { ICCNode } from "./creator/interfaces/ICCNode";
 
 export class Node {
 	public name: string;
@@ -17,6 +21,9 @@ export class Node {
 	public rotation: number;
 	public opacity: number;
 
+	public skewX: number;
+	public skewY: number;
+
 	constructor(name: string, scaleX: number, scaleY: number) {
 		if (name == "this") {
 			this.parent = null;
@@ -32,16 +39,16 @@ export class Node {
 	public setPosition(position: IVec2) {
 		this.position = { x: position.x, y: position.y };
 
-		position.x *= this.scaleX;
-		position.y *= this.scaleY;
+		this.position.x *= this.scaleX;
+		this.position.y *= this.scaleY;
 
 		if (this.parent) {
-			this.cppString += this.name + "->setPosition(" + position.x;
-			this.cppString += " + " + this.parent.name + "->getContentSize().width / 2.0f, " + position.y;
+			this.cppString += this.name + "->setPosition(" + this.position.x;
+			this.cppString += " + " + this.parent.name + "->getContentSize().width / 2.0f, " + this.position.y;
 			this.cppString += " + " + this.parent.name + "->getContentSize().height / 2.0f";
 			this.cppString += ");\n";
 		} else {
-			this.cppString += this.name + "->setPosition(" + position.x + " + this->getParent()->getContentSize().width / 2.0f, " + position.y + " + this->getParent()->getContentSize().height / 2.0f);\n";
+			this.cppString += this.name + "->setPosition(" + this.position.x + " + this->getParent()->getContentSize().width / 2.0f, " + this.position.y + " + this->getParent()->getContentSize().height / 2.0f);\n";
 		}
 	}
 
@@ -53,10 +60,10 @@ export class Node {
 			return;
 		}
 
-		size.width *= this.scaleX;
-		size.height *= this.scaleY;
+		this.size.width *= this.scaleX;
+		this.size.height *= this.scaleY;
 
-		this.cppString += this.name + "->setContentSize(cocos2d::Size(" + size.width + ", " + size.height + "));\n";
+		this.cppString += this.name + "->setContentSize(cocos2d::Size(" + this.size.width + ", " + this.size.height + "));\n";
 	}
 
 	public setAnchorPoint(anchor: IVec2) {
@@ -105,6 +112,7 @@ export class Node {
 
 	public setRotation(rotation: number) {
 		this.rotation = rotation;
+
 		// Do not return anything if the values are default
 		if (rotation == 0) {
 			return;
@@ -113,17 +121,57 @@ export class Node {
 		this.cppString += this.name + "->setRotation(" + rotation + ");\n";
 	}
 
+	public setSkew(skewX: number, skewY: number) {
+		this.skewX = skewX * this.scaleX;
+		this.skewY = skewY * this.scaleY;
+
+		if(this.skewX == 0 && this.skewY == 0) {
+			return;
+		}
+
+		this.cppString += this.name + "->setSkewX(" + this.skewX + ");\n";
+		this.cppString += this.name + "->setSkewY(" + this.skewY + ");\n";
+	}
+
+	public setSkewX(skewX: number) {
+		this.skewX = skewX * this.scaleX;
+
+		if(this.skewX == 0) {
+			return;
+		}
+
+		this.cppString += this.name + "->setSkewX(" + this.skewX + ");\n";
+	}
+
+	public setSkewY(skewY: number) {
+		this.skewY = skewY * this.scaleY;
+
+		if(this.skewY == 0) {
+			return;
+		}
+
+		this.cppString += this.name + "->setSkewY(" + this.skewY + ");\n";
+	}
+
 	public addChild(child: string) {
 		return this.name + "->addChild(" + child + ");\n";
 	}
 
-	public Create() {
-		if (this.name == "this") {
-			this.cppString = "";
-			return;
+	public Create(data: ICCNode = null) {
+		if (this.name != "this") {
+			this.cppString = "auto " + this.name + " = cocos2d::Node::create();\n";
 		}
 
-		this.cppString = "auto " + this.name + " = cocos2d::Node::create();\n";
+		if(data) {
+			this.setPosition(data._position);
+			this.setRotation(data._rotationX);
+			this.setScale(data._scale);
+			this.setAnchorPoint(data._anchorPoint);
+			this.setContentSize(data._contentSize);
+			this.setColor(data._color);
+			this.setOpacity(data._opacity);
+			this.setSkew(data._skewX, data._skewY);
+		}
 	}
 
 	public GetCPPString() {

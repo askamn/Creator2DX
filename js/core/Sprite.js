@@ -20,8 +20,19 @@ var Sprite = /** @class */ (function (_super) {
     function Sprite() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
-    Sprite.prototype.Create = function () {
+    Sprite.prototype.Create = function (data) {
+        if (data === void 0) { data = null; }
         this.cppString = "auto " + this.name + " = cocos2d::Sprite::create(\"" + AssetDB_1.AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+        if (data) {
+            this.setPosition(data._position);
+            this.setRotation(data._rotationX);
+            this.setScale(data._scale);
+            this.setAnchorPoint(data._anchorPoint);
+            this.setContentSize(data._contentSize);
+            this.setColor(data._color);
+            this.setOpacity(data._opacity);
+            this.setSkew(data._skewX, data._skewY);
+        }
     };
     return Sprite;
 }(Node_1.Node));
