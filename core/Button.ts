@@ -10,11 +10,13 @@ export class Button extends Node {
 	public spriteFrameUUID: string;
 
 	public Create(data: ICCNode = null) {
-		this.cppString = "auto " + this.name + " = cocos2d::ui::Button::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
-		this.cppString += this.name + "->setScale9Enabled(true);\n";
+		this.createVariableName();
+
+		this.cppString = this.getVariableDeclaration() + " = cocos2d::ui::Button::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+		this.cppString += this.variableName + "->setScale9Enabled(true);\n";
 
 		// Attach event listeners
-		this.cppString += this.name + `->addTouchEventListener([&](Ref* sender, cocos2d::ui::Widget::TouchEventType type){
+		this.cppString += this.variableName + `->addTouchEventListener([&](Ref* sender, cocos2d::ui::Widget::TouchEventType type){
 			switch (type)
 			{
 				case cocos2d::ui::Widget::TouchEventType::BEGAN:
@@ -27,7 +29,7 @@ export class Button extends Node {
 					// Do something
 					break;
 			}
-		});`
+		});\n`
 
 		if(data) {
 			this.setPosition(data._position);
@@ -42,15 +44,15 @@ export class Button extends Node {
 	}
 
 	public CreateWithData(ccbutton: ICCButton, label: Label) {
-		// TODO: Proper image path
-		this.cppString = "auto " + this.name + " = cocos2d::ui::Button::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
-		this.cppString += this.name + "->setScale9Enabled(true);\n";
+		this.variableName = "m_" + this.name;
+		this.cppString = this.variableName + " = cocos2d::ui::Button::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+		this.cppString += this.variableName + "->setScale9Enabled(true);\n";
 
 		this.setTextLabel(label.name);
 	}
 
 	public setTextLabel(textLabelName: string) {
-		this.cppString += this.name + "->setTitleLabel(" + textLabelName + ");\n";
+		this.cppString += this.variableName + "->setTitleLabel(" + textLabelName + ");\n";
 	}
 
 	public setPosition(position: IVec2) {
@@ -60,12 +62,12 @@ export class Button extends Node {
 		position.y *= this.scaleY;
 
 		if (this.parent) {
-			this.cppString += this.name + "->setPosition(cocos2d::Vec2(" + position.x;
-			this.cppString += " + " + this.parent.name + "->getContentSize().width / 2.0f, " + position.y;
-			this.cppString += " + " + this.parent.name + "->getContentSize().height / 2.0f";
+			this.cppString += this.variableName + "->setPosition(cocos2d::Vec2(" + position.x;
+			this.cppString += " + " + this.parent.variableName + "->getContentSize().width / 2.0f, " + position.y;
+			this.cppString += " + " + this.parent.variableName + "->getContentSize().height / 2.0f";
 			this.cppString += "));\n";
 		} else {
-			this.cppString += this.name + "->setPosition(cocos2d::Vec2(" + position.x + " + this->getParent()->getContentSize().width / 2.0f, " + position.y + " + this->getParent()->getContentSize().height / 2.0f));\n";
+			this.cppString += this.variableName + "->setPosition(cocos2d::Vec2(" + position.x + " + this->getParent()->getContentSize().width / 2.0f, " + position.y + " + this->getParent()->getContentSize().height / 2.0f));\n";
 		}
 	}
 }

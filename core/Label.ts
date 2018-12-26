@@ -3,6 +3,7 @@ import { IColor } from "./Interfaces";
 import { AssetDB } from "./AssetDB";
 import { ICCLabel } from "./creator/interfaces/ICCLabel";
 import { ICCColor } from "./creator/interfaces/ICCColor";
+import { ICCNode } from "./creator/interfaces/ICCNode";
 
 export class Label extends Node {
 	// Shamelessly copied from cocos-creator-cocos-2dx project
@@ -18,7 +19,20 @@ export class Label extends Node {
 	private verticalAlignment: number;
 	private overflow: number;
 
-	public CreateWithData(cclabel: ICCLabel, color: ICCColor) {
+	public Create(data: ICCNode = null) {
+		if (data) {
+			this.setPosition(data._position);
+			this.setRotation(data._rotationX);
+			this.setScale(data._scale);
+			this.setAnchorPoint(data._anchorPoint);
+			this.setContentSize(data._contentSize);
+			this.setColor(data._color);
+			this.setOpacity(data._opacity);
+			this.setSkew(data._skewX, data._skewY);
+		}
+	}
+
+	public SetProperties(cclabel: ICCLabel, color: ICCColor) {
 		if (cclabel._isSystemFontUsed) {
 			this.setTextWithSystemFont(cclabel._string, cclabel._fontSize);
 		} else {
@@ -33,11 +47,21 @@ export class Label extends Node {
 		//this.cppString = "auto " + this.name + " = cocos2d::Label::create(\"" + "sprites/rect_curved1.png" + "\");\n";
 	}
 
-	public setTextWithSystemFont(text: string, fontSize: number) {
+	public setText(text: string, fontUUID: string, fontSize: number) {
+		this.createVariableName();
 		this.text = text;
 		this.fontSize = fontSize * this.scaleX;
 
-		this.cppString = "auto " + this.name + " = cocos2d::Label::createWithSystemFont(\"" + text + "\", \"arial\", " + this.fontSize + ");\n";
+		let font = AssetDB.i().GetAsset(fontUUID);
+		this.cppString = this.getVariableDeclaration() + " = cocos2d::Label::createWithTTF(\"" + text + "\", \"" + font + "\", " + this.fontSize + ");\n";
+	}
+
+	public setTextWithSystemFont(text: string, fontSize: number) {
+		this.createVariableName();
+		this.text = text;
+		this.fontSize = fontSize * this.scaleX;
+
+		this.cppString = this.getVariableDeclaration() + " = cocos2d::Label::createWithSystemFont(\"" + text + "\", \"arial\", " + this.fontSize + ");\n";
 	}
 
 	public setOverflow(overflow: number) {
@@ -47,38 +71,31 @@ export class Label extends Node {
 			return;
 		}
 
-		this.cppString += this.name + "->setOverflow(cocos2d::Label::Overflow::" + Label.OVERFLOW_TYPE[overflow] + ");\n";
+		this.cppString += this.variableName + "->setOverflow(cocos2d::Label::Overflow::" + Label.OVERFLOW_TYPE[overflow] + ");\n";
 	}
 
 	public setHorizontalAlignment(alignment: number) {
 		this.horizontalAlignment = alignment;
 
-		this.cppString += this.name + "->setHorizontalAlignment(cocos2d::TextHAlignment::" + Label.H_ALIGNMENTS[alignment] + ");\n";
+		this.cppString += this.variableName + "->setHorizontalAlignment(cocos2d::TextHAlignment::" + Label.H_ALIGNMENTS[alignment] + ");\n";
 	}
 
 	public setVerticalAlignment(alignment: number) {
 		this.verticalAlignment = alignment;
 
-		this.cppString += this.name + "->setVerticalAlignment(cocos2d::TextVAlignment::" + Label.V_ALIGNMENTS[alignment] + ");\n";
-	}
-
-	public setText(text: string, fontUUID: string, fontSize: number) {
-		this.text = text;
-		this.fontSize = fontSize * this.scaleX;
-
-		let font = AssetDB.i().GetAsset(fontUUID);
-		this.cppString = "auto " + this.name + " = cocos2d::Label::createWithTTF(\"" + text + "\", \"" + font + "\", " + this.fontSize + ");\n";
+		this.cppString += this.variableName + "->setVerticalAlignment(cocos2d::TextVAlignment::" + Label.V_ALIGNMENTS[alignment] + ");\n";
 	}
 
 	public setLineHeight(lineHeight: number) {
 		this.lineHeight = lineHeight * this.scaleX;
 
-		this.cppString += this.name + "->setLineHeight(" + this.lineHeight + ");\n";
+		// TODO: Find proper fix for label's lineheight
+		this.cppString += "//" + this.variableName + "->setLineHeight(" + this.lineHeight + ");\n";
 	}
 
 	public setTextColor(color: ICCColor) {
 		this.textColor = { r: color.r, g: color.g, b: color.b, a: color.a };
 
-		this.cppString += this.name + "->setTextColor(cocos2d::Color4B(" + color.r + ", " + color.g + ", " + color.b + ", " + color.a + "));\n";
+		this.cppString += this.variableName + "->setTextColor(cocos2d::Color4B(" + color.r + ", " + color.g + ", " + color.b + ", " + color.a + "));\n";
 	}
 }

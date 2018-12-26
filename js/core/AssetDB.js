@@ -1,18 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var fs_1 = require("fs");
-var AssetDB = /** @class */ (function () {
-    function AssetDB() {
-    }
-    AssetDB.i = function () {
+const fs_1 = require("fs");
+class AssetDB {
+    constructor() { }
+    static i() {
         if (AssetDB.instance === null) {
             AssetDB.instance = new AssetDB();
         }
         return AssetDB.instance;
-    };
-    AssetDB.prototype.LoadAssetDB = function (libraryPath) {
-        var data = null;
-        var assetDBPath = libraryPath + '/uuid-to-mtime.json';
+    }
+    LoadAssetDB(libraryPath) {
+        let data = null;
+        let assetDBPath = libraryPath + '/uuid-to-mtime.json';
         try {
             data = fs_1.readFileSync(assetDBPath, 'utf-8');
         }
@@ -34,26 +33,25 @@ var AssetDB = /** @class */ (function () {
             console.log("[LoadAssetDB]: Imports folder does not exist!", this.importsPath);
             process.exit();
         }
-    };
-    AssetDB.prototype.GetAsset = function (uuid) {
-        var path = this.importsPath + '/' + uuid.slice(0, 2) + "/" + uuid + ".json";
+    }
+    GetAsset(uuid) {
+        let path = this.importsPath + '/' + uuid.slice(0, 2) + "/" + uuid + ".json";
         if (!fs_1.existsSync(path)) {
             console.warn("[GetAsset]: " + path + " does not exist.");
             return "";
         }
-        var data = fs_1.readFileSync(path, 'utf-8');
-        var json = JSON.parse(data);
+        let data = fs_1.readFileSync(path, 'utf-8');
+        let json = JSON.parse(data);
         switch (json.__type__) {
             case 'cc.SpriteFrame': {
-                var pathBits = this.UUIDMap[json.content.texture].relativePath.split('/');
+                let pathBits = this.UUIDMap[json.content.texture].relativePath.split('/');
                 return 'sprites/' + pathBits[pathBits.length - 1];
             }
             case 'cc.TTFFont': {
                 return 'fonts/' + json._name + '.ttf';
             }
         }
-    };
-    AssetDB.instance = null;
-    return AssetDB;
-}());
+    }
+}
+AssetDB.instance = null;
 exports.AssetDB = AssetDB;

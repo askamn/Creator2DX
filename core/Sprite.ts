@@ -6,7 +6,8 @@ export class Sprite extends Node {
 	public spriteFrameUUID: string;
 
 	public Create(data: ICCNode = null) {
-		this.cppString = "auto " + this.name + " = cocos2d::Sprite::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+		this.createVariableName();
+		this.cppString = this.getVariableDeclaration() + " = cocos2d::Sprite::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
 
 		if(data) {
 			this.setPosition(data._position);

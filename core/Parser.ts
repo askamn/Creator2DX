@@ -12,13 +12,27 @@ import { ICCColor } from "./creator/interfaces/ICCColor";
 import { Config } from "../config";
 import { ScrollView } from "./ScrollView";
 import { ICCScrollView } from "./creator/interfaces/ICCScrollView";
+import { ICCNode } from "./creator/interfaces/ICCNode";
+import { EditBox } from "./EditBox";
+import { ICCEditBox } from "./creator/interfaces/ICCEditBox";
 
-enum Components {
+export class CPPTypes {
+	public static Node = "cocos2d::Node";
+	public static Button = "cocos2d::ui::Button";
+	public static Sprite = "cocos2d::Sprite";
+	public static ImageView = "cocos2d::ui::ImageView";
+	public static ScrollView = "cocos2d::ui::ScrollView";
+	public static Label = "cocos2d::Label";
+	public static EditBox = "cocos2d::ui::EditBox";
+}
+
+export enum Components {
 	Sprite = 1,
 	Button,
 	Label,
 	Widget,
 	ScrollView,
+	EditBox,
 }
 
 const COCOS_2DX_DESIGN_RESOLUTION_WIDTH = 360;
@@ -29,6 +43,11 @@ const CREATOR_DESIGN_RESOLUTION_HEIGHT = 1280;
 
 const SCALE_X = COCOS_2DX_DESIGN_RESOLUTION_WIDTH / CREATOR_DESIGN_RESOLUTION_WIDTH;
 const SCALE_Y = COCOS_2DX_DESIGN_RESOLUTION_HEIGHT / CREATOR_DESIGN_RESOLUTION_HEIGHT;
+
+export interface CPPVariable {
+	name: string;
+	type: string;
+}
 
 export class Parser {
 	private json: Object;
@@ -41,6 +60,8 @@ export class Parser {
 	private cppFile: string;
 
 	private libraryFolder: string;
+	private variableCache: CPPVariable[];
+	private variables: string;
 
 	constructor(filePath: string) {
 		let data: string = null;
@@ -66,6 +87,7 @@ export class Parser {
 		this.json = JSON.parse(data);
 		this.output = "";
 		this.nodeNameCache = {};
+		this.variableCache = [];
 
 		// Make sure that the asset database exists
 		let absolutePathBits = resolve(filePath).split('/');
@@ -88,7 +110,7 @@ export class Parser {
 			process.exit();
 		}
 
-		for(var key in this.json) {
+		for (var key in this.json) {
 			if (this.json[key]._name) {
 				this.json[key].__name = this.json[key]._name;
 			}
@@ -97,11 +119,13 @@ export class Parser {
 		this.className = this.json[1]._name;
 		// Assumption, this is the root node
 		this.parseNode(this.json[1], true);
+		this.constructVariables();
 
 		let replacements = {
 			'{%CLASSNAME%}': this.className,
 			'{%PARSER_OUTPUT%}': this.output,
 			'{%NAMESPACE%}': Config.Namespace,
+			'{%VARIABLES%}': this.variables
 		};
 
 		this.headerFile = Config.HeaderTemplate.replace(/{%\w+%}/g, function (all) {
@@ -135,6 +159,10 @@ export class Parser {
 		return component.__type__ == 'cc.ScrollView';
 	}
 
+	private isEditBox(component) {
+		return component.__type__ == 'cc.EditBox';
+	}
+
 	private isNode(component) {
 		return component.__type__ == 'cc.Node';
 	}
@@ -151,7 +179,7 @@ export class Parser {
 		return false;
 	}
 
-	private parseScrollView(object: any, component: ICCScrollView, parent: Node): ScrollView {
+	private parseScrollView(object: ICCNode, component: ICCScrollView, parent: Node): ScrollView {
 		let scrollview: ScrollView = new ScrollView(object._name, SCALE_X, SCALE_Y);
 
 		// Only parse the sprite if it has a sprite frame
@@ -162,10 +190,32 @@ export class Parser {
 
 		this.output += scrollview.GetCPPString();
 
+		// Now parse the content node
+		try {
+			for (let i = 0; i < object._children.length; ++i) {
+				let child: ICCNode = this.json[object._children[i].__id__];
+
+				if (child.__name == 'view') {
+					for (let j = 0; j < child._children.length; ++j) {
+						let subchild: ICCNode = this.json[child._children[j].__id__];
+
+						if (subchild.__name == 'content') {
+							this.parseNode(subchild, false, scrollview);
+							throw ("Sup");
+						}
+					}
+				}
+			}
+
+			console.warn("Failed to find content node in scrollview");
+		} catch (noobException) {
+			// Ignored
+		}
+
 		return scrollview;
 	}
 
-	private parseSprite(object: any, component: any, parent: Node): Sprite | ImageView {
+	private parseSprite(object: ICCNode, component: ICCSprite, parent: Node): Sprite | ImageView {
 		let sprite: Sprite | ImageView = null;
 
 		switch (component._type) {
@@ -194,7 +244,29 @@ export class Parser {
 		return sprite;
 	}
 
-	private parseButton(object, parent): Button {
+	private parseLabel(object: ICCNode, component: ICCLabel, parent: Node): Label {
+		let label = new Label(object._name, SCALE_X, SCALE_Y);
+		label.parent = parent;
+		label.SetProperties(component, object._color);
+		label.Create(object);
+
+		this.output += label.GetCPPString();
+
+		return label;
+	}
+
+	private parseEditBox(object: ICCNode, component: ICCEditBox, parent: Node): EditBox {
+		let editBox = new EditBox(object._name, SCALE_X, SCALE_Y);
+		editBox.parent = parent;
+		editBox.SetProperties(component, object._contentSize);
+		editBox.Create(object);
+
+		this.output += editBox.GetCPPString();
+
+		return editBox;
+	}
+
+	private parseButton(object: ICCNode, parent: Node): Button {
 		let spriteFrameUUID: string = null;
 		let buttonText: string = null;
 		let button: Button = null;
@@ -229,8 +301,8 @@ export class Parser {
 		}
 
 		// Create a new label
-		let label = new Label(object._name + "_label", SCALE_X, SCALE_Y);
-		label.CreateWithData(cclabel, textColor);
+		let label = new Label(object._name + "_label", SCALE_X, SCALE_Y, true);
+		label.SetProperties(cclabel, textColor);
 
 		this.output += label.GetCPPString();
 
@@ -249,7 +321,7 @@ export class Parser {
 			case Components.Sprite: {
 				for (let i = 0; i < object._components.length; ++i) {
 					let component = this.json[object._components[i].__id__];
-		
+
 					if (this.isSprite(component)) {
 						return component;
 					}
@@ -259,8 +331,38 @@ export class Parser {
 			case Components.Label: {
 				for (let i = 0; i < object._components.length; ++i) {
 					let component = this.json[object._components[i].__id__];
-		
+
 					if (this.isLabel(component)) {
+						return component;
+					}
+				}
+			} break;
+
+			case Components.Button: {
+				for (let i = 0; i < object._components.length; ++i) {
+					let component = this.json[object._components[i].__id__];
+
+					if (this.isButton(component)) {
+						return component;
+					}
+				}
+			} break;
+
+			case Components.ScrollView: {
+				for (let i = 0; i < object._components.length; ++i) {
+					let component = this.json[object._components[i].__id__];
+
+					if (this.isScrollView(component)) {
+						return component;
+					}
+				}
+			} break;
+
+			case Components.EditBox: {
+				for (let i = 0; i < object._components.length; ++i) {
+					let component = this.json[object._components[i].__id__];
+
+					if (this.isEditBox(component)) {
 						return component;
 					}
 				}
@@ -270,7 +372,7 @@ export class Parser {
 		return null;
 	}
 
-	private parseNode(object, isRoot: boolean = false, parent: Node = null) {
+	private parseNode(object, isRoot: boolean = false, parent: Node = null): Node {
 		if (this.isNode(object)) {
 			object._name = this.camelize(object._name);
 			object.__name = object._name;
@@ -282,6 +384,8 @@ export class Parser {
 				this.nodeNameCache[object._name] = 0;
 			}
 
+			let cppVariable: CPPVariable = { name: object._name, type: "" };
+
 			let isParsed: boolean = false;
 			let isButton: boolean = false;
 			let currentNode: Node = null;
@@ -290,6 +394,8 @@ export class Parser {
 			if (this.hasButtonComponent(object)) {
 				isParsed = true;
 				isButton = true;
+				cppVariable.type = CPPTypes.Button;
+				this.variableCache.push(cppVariable);
 				currentNode = this.parseButton(object, parent);
 			} else {
 				// Parse components
@@ -297,11 +403,35 @@ export class Parser {
 					let component = this.json[object._components[i].__id__];
 
 					if (this.isSprite(component) && !isParsed) {
+						// Sprite Component
 						isParsed = true;
+						cppVariable.type = (component._type == 0) ? CPPTypes.Sprite : CPPTypes.ImageView;
+						this.variableCache.push(cppVariable);
 						currentNode = this.parseSprite(object, component, parent);
 					} else if (this.isScrollView(component) && !isParsed) {
+						// ScrollView Component
 						isParsed = true;
+						cppVariable.type = CPPTypes.ScrollView;
+						this.variableCache.push(cppVariable);
 						currentNode = this.parseScrollView(object, component, parent);
+
+						return currentNode;
+					} else if (this.isLabel(component) && !isParsed) {
+						// Label Component
+						isParsed = true;
+						cppVariable.type = CPPTypes.Label;
+						this.variableCache.push(cppVariable);
+						currentNode = this.parseLabel(object, component, parent);
+					} else if (this.isEditBox(component) && !isParsed) {
+						console.log("Found an editbox; Parsing...");
+						// EditBox Component
+						isParsed = true;
+						cppVariable.type = CPPTypes.EditBox;
+						this.variableCache.push(cppVariable);
+						currentNode = this.parseEditBox(object, component, parent);
+
+						// No need to parse editBox's chidlren
+						return currentNode;
 					}
 				}
 			}
@@ -311,25 +441,43 @@ export class Parser {
 				node.parent = parent;
 				node.Create(object);
 
+				cppVariable.type = CPPTypes.Node;
+				this.variableCache.push(cppVariable);
 				currentNode = node;
 
 				this.output += node.GetCPPString();
 			}
 
-			if (currentNode) {
+			if (currentNode == null) {
+				console.log(object, isParsed);
+			}
+
+			//if (currentNode) {
 				// Parse children
 				for (let i = 0; i < object._children.length; ++i) {
 					let child = this.json[object._children[i].__id__];
 
 					// If this node had a button component, we would have already parsed their label and base child nodes
-					if(isButton && child.__name == "base" || child.__name == "label") {
+					if (isButton && child.__name == "base" || child.__name == "label") {
 						continue;
 					}
 
-					this.parseNode(child, false, currentNode);
-					this.output += currentNode.addChild(child._name);
+					let node = this.parseNode(child, false, currentNode);
+					this.output += currentNode.addChild(node.variableName);
 				}
-			}
+			//}
+			
+			return currentNode;
+		}
+
+		return null;
+	}
+
+	private constructVariables() {
+		this.variables = '';
+
+		for (let i = 0; i < this.variableCache.length; i++) {
+			this.variables += this.variableCache[i].type + "* m_" + this.variableCache[i].name + " = nullptr;\n";
 		}
 	}
 

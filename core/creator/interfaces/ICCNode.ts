@@ -30,4 +30,7 @@ export interface ICCNode {
 	_rotationX: number;
 	_rotationY: number;
 	_id: string;
+
+	// Custom property
+	__name: string;
 }

@@ -7,10 +7,11 @@ export class ImageView extends Node {
 	public spriteFrameUUID: string;
 
 	public Create(data: ICCNode = null) {
-		this.cppString = "auto " + this.name + " = cocos2d::ui::ImageView::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
-		this.cppString += this.name + "->setScale9Enabled(true);\n";
+		this.createVariableName();
+		this.cppString = this.getVariableDeclaration() + " = cocos2d::ui::ImageView::create(\"" + AssetDB.i().GetAsset(this.spriteFrameUUID) + "\");\n";
+		this.cppString += this.variableName + "->setScale9Enabled(true);\n";
 
-		if(data) {
+		if (data) {
 			this.setPosition(data._position);
 			this.setRotation(data._rotationX);
 			this.setScale(data._scale);
@@ -29,12 +30,12 @@ export class ImageView extends Node {
 		position.y *= this.scaleY;
 
 		if (this.parent) {
-			this.cppString += this.name + "->setPosition(cocos2d::Vec2(" + position.x;
-			this.cppString += " + " + this.parent.name + "->getContentSize().width / 2.0f, " + position.y;
-			this.cppString += " + " + this.parent.name + "->getContentSize().height / 2.0f";
+			this.cppString += this.variableName + "->setPosition(cocos2d::Vec2(" + position.x;
+			this.cppString += " + " + this.parent.variableName + "->getContentSize().width / 2.0f, " + position.y;
+			this.cppString += " + " + this.parent.variableName + "->getContentSize().height / 2.0f";
 			this.cppString += "));\n";
 		} else {
-			this.cppString += this.name + "->setPosition(cocos2d::Vec2(" + position.x + " + this->getParent()->getContentSize().width / 2.0f, " + position.y + " + this->getParent()->getContentSize().height / 2.0f));\n";
+			this.cppString += this.variableName + "->setPosition(cocos2d::Vec2(" + position.x + " + this->getParent()->getContentSize().width / 2.0f, " + position.y + " + this->getParent()->getContentSize().height / 2.0f));\n";
 		}
 	}
 }
